@@ -9,23 +9,20 @@ import (
 
 var players []*structures.Player
 
-func CreatePlayerFromToken(tokenClaims map[string]interface{}) *structures.Player {
+func CreatePlayerFromToken(tokenClaims map[string]interface{}) (*structures.Player, error) {
 
 	username, ok := tokenClaims["username"].(string)
 	if !ok {
-		fmt.Println("Username claim not found in token")
-		return nil
+		return nil, fmt.Errorf("user id not found from token claims")
 	}
 
 	userID, ok := tokenClaims["user_id"].(string)
 	if !ok {
-		fmt.Println("User id claim not found in token")
-		return nil
+		return nil, fmt.Errorf("user id not found from token claims")
 	}
 	balance, ok := tokenClaims["balance"].(float64)
 	if !ok {
-		fmt.Println("Balance claim not found in token")
-		return nil
+		return nil, fmt.Errorf("balance not found from token claims")
 	}
 
 	player := &structures.Player{
@@ -39,7 +36,7 @@ func CreatePlayerFromToken(tokenClaims map[string]interface{}) *structures.Playe
 	}
 
 	players = append(players, player) //Pushed new created user to this array. We will fetch players from this array.
-	return player
+	return player, nil
 }
 
 func GetPlayerById(id string) (*structures.Player, error) {

@@ -14,8 +14,8 @@ type Table struct {
 	MaxSeats int
 }
 
-func CreateTable(maxSeats int) *structures.Table {
-	return &structures.Table{
+func CreateTable(maxSeats int) *Table {
+	return &Table{
 		Seats:    make(map[int]*structures.Player),
 		MaxSeats: maxSeats,
 	}
@@ -53,7 +53,7 @@ func (t *Table) RemovePlayerFromTableById(userid string) error {
 	return fmt.Errorf("player (%s) not on the table", userid)
 }
 
-func (t *Table) GetPlayer(userid string) (*structures.Player, error) {
+func (t *Table) GetPlayerById(userid string) (*structures.Player, error) {
 	t.Lock.RLock()
 	defer t.Lock.RUnlock()
 
@@ -73,7 +73,7 @@ func (t *Table) SetPlayerStatus(userid string, newStatus status.GameStatus) {
 	t.Lock.Lock()
 	defer t.Lock.Unlock()
 
-	p, err := t.GetPlayer(userid)
+	p, err := t.GetPlayerById(userid)
 	if err != nil {
 		panic(err)
 	}
@@ -98,4 +98,30 @@ func (t *Table) AddPlayerOnPosition(userid string, position int) error {
 	t.Seats[position] = player
 
 	return nil
+}
+
+func (t *Table) GetPlayerAfter(userid string) (*structures.Player, error) {
+	t.Lock.RLock()
+	defer t.Lock.RUnlock()
+
+	currentPlayer, err := t.GetPlayerById(userid)
+	if err != nil {
+		return nil, err
+	}
+
+	i := currentPlayer.TablePosition + 1
+	for {
+		nextPlayer, ok := t.Seats[i]
+		if nextPlayer == currentPlayer {
+			return nil, fmt.Errorf("%s is the only player on the table", userid)
+		}
+		if ok {
+			return nextPlayer, nil
+		}
+
+		i++
+		if t.MaxSeats <= i {
+			i = 0
+		}
+	}
 }

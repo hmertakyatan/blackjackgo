@@ -2,7 +2,7 @@ package status
 
 type PlayerAction uint8
 
-func (pa PlayerAction) String() string {
+func (pa PlayerAction) PlayerActionCase() string {
 	switch pa {
 	case PlayerActionNone:
 		return "NONE"

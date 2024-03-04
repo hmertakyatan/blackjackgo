@@ -2,12 +2,14 @@ package status
 
 type GameStatus uint8
 
-func (g GameStatus) String() string {
+func (g GameStatus) GameStatusCase() string {
 	switch g {
 	case GameStatusConnected:
 		return "CONNECTED"
 	case GameStatusPlayerReady:
 		return "PLAYER READY"
+	case GameStatusInitialDeal:
+		return "INITIAL"
 	case GameStatusDealing:
 		return "DEALING"
 	case GamestatusDone:
@@ -20,6 +22,7 @@ func (g GameStatus) String() string {
 const (
 	GameStatusConnected GameStatus = iota
 	GameStatusPlayerReady
+	GameStatusInitialDeal
 	GameStatusDealing
 	GamestatusDone
 )
