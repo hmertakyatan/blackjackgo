@@ -14,6 +14,14 @@ func (pa PlayerAction) PlayerActionCase() string {
 		return "DOUBLE"
 	case PlayerActionSplit:
 		return "SPLIT"
+	case PlayerActionBet:
+		return "BETTING"
+	case PlayerActionReady:
+		return "READY"
+	case PlayerActionDealing:
+		return "DEALING"
+	case PlayerActionSitOnSeat:
+		return "SEAT"
 	default:
 		return "INVALID"
 	}
@@ -25,4 +33,8 @@ const (
 	PlayerActionStand
 	PlayerActionDouble
 	PlayerActionSplit
+	PlayerActionBet
+	PlayerActionReady
+	PlayerActionDealing
+	PlayerActionSitOnSeat
 )

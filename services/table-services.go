@@ -4,31 +4,63 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/hmertakyatan/blackjackgo/status"
-	"github.com/hmertakyatan/blackjackgo/structures"
 )
 
-type Table struct {
-	Lock     sync.RWMutex
-	Seats    map[int]*structures.Player
-	MaxSeats int
+type TableService struct {
+	Lock       sync.RWMutex
+	Seats      map[int]interface{}
+	MaxSeats   int
+	PlayerList *PlayersList
+	Dealer     *Dealer
+}
+type Dealer struct {
+	Player
+	ID            string
+	Username      string
+	Balance       float64 `json:"balance"`
+	Bet           float64 `json:"bet"`
+	Hand          []Card
+	CurrentAction status.PlayerAction `json:"current_player_action"`
+	GameStatus    status.GameStatus   `json:"game_status"`
+	TablePosition int                 `json:"player_table_posion"`
+}
+type Card struct {
+	Type  string
+	Value string
 }
 
-func CreateTable(maxSeats int) *Table {
-	return &Table{
-		Seats:    make(map[int]*structures.Player),
-		MaxSeats: maxSeats,
+func CreateNewDealer() *Dealer {
+	dealer := &Dealer{
+		ID:            uuid.New().String(),
+		Username:      "Dealer",
+		Hand:          []Card{},
+		CurrentAction: status.PlayerActionReady,
+		Balance:       0,
+		TablePosition: 0,
 	}
+	return dealer
 }
 
-func (t *Table) PlayersAtTheTable() []*structures.Player {
+func NewTable(maxSeats int) *TableService {
+	table := &TableService{
+		Seats:      make(map[int]interface{}),
+		MaxSeats:   maxSeats,
+		PlayerList: NewPlayersList(),
+		Dealer:     CreateNewDealer(),
+	}
+	table.AddDealerOnPosition(table.Dealer)
+	return table
+}
+
+func (t *TableService) PlayersAtTheTable() []*Player {
 	t.Lock.RLock()
 	defer t.Lock.RUnlock()
-
-	players := []*structures.Player{}
-	for i := 0; i < t.MaxSeats; i++ {
-		player, ok := t.Seats[i]
-		if ok {
+	//we check every single seat and selecting players. Because we have a dealer on the seat.
+	players := []*Player{}
+	for _, seat := range t.Seats {
+		if player, ok := seat.(*Player); ok {
 			players = append(players, player)
 		}
 	}
@@ -36,12 +68,12 @@ func (t *Table) PlayersAtTheTable() []*structures.Player {
 	return players
 }
 
-func (t *Table) RemovePlayerFromTableById(userid string) error {
+func (t *TableService) RemovePlayerFromTableById(userid string) error {
 	t.Lock.Lock()
 	defer t.Lock.Unlock()
 
 	for i := 0; i < t.MaxSeats; i++ {
-		player, ok := t.Seats[i]
+		player, ok := t.Seats[i].(*Player)
 		if ok {
 			if player.ID == userid {
 				delete(t.Seats, i)
@@ -53,34 +85,37 @@ func (t *Table) RemovePlayerFromTableById(userid string) error {
 	return fmt.Errorf("player (%s) not on the table", userid)
 }
 
-func (t *Table) GetPlayerById(userid string) (*structures.Player, error) {
-	t.Lock.RLock()
-	defer t.Lock.RUnlock()
-
+func (t *TableService) GetPlayerFromTableById(userid string) (*Player, error) {
 	for i := 0; i < t.MaxSeats; i++ {
-		player, ok := t.Seats[i]
+		player, ok := t.Seats[i].(*Player)
 		if ok {
 			if player.ID == userid {
 				return player, nil
 			}
 		}
-
 	}
 	return nil, fmt.Errorf("Player not found with ID: %s", userid)
 }
 
-func (t *Table) SetPlayerStatus(userid string, newStatus status.GameStatus) {
+func (t *TableService) SetPlayerStatus(userid string, newStatus status.GameStatus) {
 	t.Lock.Lock()
 	defer t.Lock.Unlock()
 
-	p, err := t.GetPlayerById(userid)
+	p, err := t.GetPlayerFromTableById(userid)
 	if err != nil {
 		panic(err)
 	}
 	p.GameStatus = newStatus
 }
-
-func (t *Table) AddPlayerOnPosition(userid string, position int) error {
+func (t *TableService) isPositionOccupied(position int) bool {
+	_, occupied := t.Seats[position]
+	if occupied {
+		return true
+	} else {
+		return false
+	}
+}
+func (t *TableService) AddPlayerOnPosition(userid string, position int) error {
 	t.Lock.Lock()
 	defer t.Lock.Unlock()
 
@@ -88,40 +123,86 @@ func (t *Table) AddPlayerOnPosition(userid string, position int) error {
 		return fmt.Errorf("player table is full")
 	}
 
-	player, err := GetPlayerById(userid)
+	if t.isPositionOccupied(position) {
+		return fmt.Errorf("position %d is already occupied", position)
+	}
+
+	player, err := t.PlayerList.GetPlayerById(userid)
 	if err != nil {
 		return err
 	}
-	player.TablePosition = position
-	player.GameStatus = status.GameStatusPlayerReady
 
 	t.Seats[position] = player
+	player.TablePosition = position
+	player.CurrentAction = status.PlayerActionBet
 
 	return nil
 }
 
-func (t *Table) GetPlayerAfter(userid string) (*structures.Player, error) {
+func (t *TableService) AddDealerOnPosition(dealer *Dealer) {
+	t.Lock.Lock()
+	defer t.Lock.Unlock()
+	dealer.CurrentAction = status.PlayerActionReady
+	t.Seats[0] = dealer
+	dealer.TablePosition = 0
+	dealer.CurrentAction = status.PlayerActionReady
+	dealer.GameStatus = status.GameStatusPlayerReady
+
+}
+
+func (t *TableService) GetPlayerAfter(userid string) (*Player, error) {
 	t.Lock.RLock()
 	defer t.Lock.RUnlock()
 
-	currentPlayer, err := t.GetPlayerById(userid)
+	currentPlayer, err := t.GetPlayerFromTableById(userid)
 	if err != nil {
 		return nil, err
 	}
 
 	i := currentPlayer.TablePosition + 1
 	for {
-		nextPlayer, ok := t.Seats[i]
-		if nextPlayer == currentPlayer {
-			return nil, fmt.Errorf("%s is the only player on the table", userid)
-		}
+		nextPlayer, ok := t.Seats[i].(*Player)
 		if ok {
 			return nextPlayer, nil
 		}
 
 		i++
-		if t.MaxSeats <= i {
+		if i >= t.MaxSeats {
 			i = 0
 		}
+
+		// Tüm oyuncuların dolaşıldığını kontrol et
+		if i == currentPlayer.TablePosition {
+			return nil, fmt.Errorf("%s is the only player on the table", userid)
+		}
 	}
+}
+
+func (t *TableService) CollectBetFromPlayerOnTheTable(userid string, value float64) error {
+	t.Lock.RLock()
+	defer t.Lock.RUnlock()
+	if value <= 0 {
+		return fmt.Errorf("bet cannot be zero or negative ")
+	}
+	player, err := t.PlayerList.GetPlayerById(userid)
+	if err != nil {
+		return fmt.Errorf("Player cannot find from table player list")
+	}
+
+	if player.Balance < value {
+		return fmt.Errorf("not enough balance player: %s", player.Username)
+	}
+	player.Bet = value
+	player.Balance -= value
+	player.CurrentAction = status.PlayerActionReady
+	player.GameStatus = status.GameStatusPlayerReady
+
+	return nil
+}
+
+func (t *TableService) JoinToTableList(player *Player) {
+	t.Lock.RLock()
+	defer t.Lock.RUnlock()
+	t.PlayerList.List = append(t.PlayerList.List, player)
+
 }

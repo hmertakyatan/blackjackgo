@@ -7,7 +7,7 @@ func (g GameStatus) GameStatusCase() string {
 	case GameStatusConnected:
 		return "CONNECTED"
 	case GameStatusPlayerReady:
-		return "PLAYER READY"
+		return "WAITING PLAYERS READY"
 	case GameStatusInitialDeal:
 		return "INITIAL"
 	case GameStatusDealing:

@@ -1,16 +1,14 @@
 package services
 
-import "github.com/hmertakyatan/blackjackgo/structures"
-
 type Game struct {
-	PlayerHand []structures.Card
-	DealerHand []structures.Card
-	Deck       []structures.Card
+	PlayerHand []Card
+	DealerHand []Card
+	Deck       []Card
 	GameOver   bool
 	PlayerWins bool
 }
 
-func (g *Game) ScoreCalculator(hand []structures.Card) (int, bool) {
+func (g *Game) ScoreCalculator(hand []Card) (int, bool) {
 	score := 0
 	aces := 0     //aces quantity
 	soft := false //if player has aces and his score below than 21, it is soft hand, like 2/12 , 5/15 etc.
